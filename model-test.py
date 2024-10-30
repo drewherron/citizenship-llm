@@ -27,7 +27,18 @@ def create_vectorstore(splits):
     return vectorstore
 
 def main():
-    print("Hi.")
+    # Load documents
+    directory_path = "documents"
+    print("Loading documents...")
+    documents = load_documents(directory_path)
+
+    # Split the documents
+    print("Splitting documents...")
+    splits = split_documents(documents)
+
+    # Create vectorstore
+    print("Creating vectorstore...")
+    vectorstore = create_vectorstore(splits)
 
 if __name__ == '__main__':
     main()
