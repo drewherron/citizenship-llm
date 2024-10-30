@@ -1,6 +1,6 @@
 import os
 import sys
-from langchain_community.document_loaders import DirectoryLoader
+from langchain_community.document_loaders import PyPDFDirectoryLoader
 from langchain.text_splitter import RecursiveCharacterTextSplitter
 #from langchain_community.embeddings import OpenAIEmbeddings
 from langchain_openai import OpenAIEmbeddings
@@ -15,8 +15,9 @@ from langchain.memory import ConversationBufferMemory
 # Get environment variables
 api_key = os.environ.get("API_KEY")
 
+# Load documents
 def load_documents(directory_path):
-    loader = DirectoryLoader(directory_path, glob='**/*.txt')
+    loader = PyPDFDirectoryLoader(directory_path)
     documents = loader.load()
     return documents
 
