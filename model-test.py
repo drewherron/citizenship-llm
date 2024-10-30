@@ -7,6 +7,9 @@ from langchain.vectorstores import Chroma
 from langchain.prompts import ChatPromptTemplate
 from langchain.chat_models import ChatOpenAI
 from langchain.retrievers import MultiQueryRetriever
+from langchain.chains import ConversationalRetrievalChain
+from langchain.memory import ConversationBufferMemory
+
 
 # Get environment variables
 api_key = os.environ.get("API_KEY")
@@ -52,6 +55,24 @@ Original question: {question}
 
     return multi_query_retriever
 
+# Create the conversational retrieval chain
+def create_conversational_chain(retriever):
+    llm = ChatOpenAI(temperature=0)
+    memory = ConversationBufferMemory(memory_key="chat_history", return_messages=True)
+    conversational_chain = ConversationalRetrievalChain(
+        retriever=retriever,
+        memory=memory,
+        combine_docs_chain_kwargs={'prompt': ChatPromptTemplate.from_template("""
+Use the following pieces of context to answer the question at the end. If you don't know the answer, just say that you don't know; don't try to make up an answer.
+
+{context}
+
+Question: {question}
+""")}
+    )
+    return conversational_chain
+
+
 def main():
     # Load documents
     directory_path = "documents"
@@ -69,6 +90,10 @@ def main():
     # Create retriever
     print("Creating retriever...")
     retriever = create_retriever(vectorstore)
+
+    # Create conversational chain
+    print("Setting up conversational chain...")
+    chain = create_conversational_chain(retriever)
 
 if __name__ == '__main__':
     main()
