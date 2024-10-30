@@ -97,5 +97,21 @@ def main():
     print("Setting up conversational chain...")
     chain = create_conversational_chain(retriever)
 
+    print("\nWelcome to the Citizenship Study Assistant. You can start asking questions now.\n")
+
+    # Start the REPL loop
+    while True:
+        try:
+            user_input = input("You: ")
+            if user_input.lower() in ['exit', 'quit']:
+                print("Assistant: Goodbye!")
+                break
+            # Get the response from the chain
+            response = chain({"question": user_input})
+            print("Assistant:", response["answer"])
+        except (KeyboardInterrupt, EOFError):
+            print("\nAssistant: Goodbye!")
+            break
+
 if __name__ == '__main__':
     main()
