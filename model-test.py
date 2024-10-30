@@ -29,6 +29,10 @@ def split_documents(documents):
     print(f"Split into {len(splits)} chunks.")
     return splits
 
+# Define document formatting function
+def format_docs(docs):
+    return "\n\n".join(doc.page_content for doc in docs)
+
 # Create the vectorstore using OpenAI embeddings and Chroma
 def create_vectorstore(splits):
     embeddings = OpenAIEmbeddings()
@@ -59,12 +63,8 @@ def main():
     retriever = vectorstore.as_retriever()
     prompt = hub.pull("rlm/rag-prompt")
 
-    # Initialize LLM
+    # Initialize LLM (you could use GoogleGenerativeAI or OpenAI)
     llm = ChatOpenAI(model_name="gpt-3.5-turbo", temperature=0)
-
-    # Define document formatting function
-    def format_docs(docs):
-        return "\n\n".join(doc.page_content for doc in docs)
 
     # Define RAG chain
     rag_chain = (
@@ -74,14 +74,13 @@ def main():
         | StrOutputParser()
     )
 
-    # Introduction, list loaded document sources
-    print("\nWelcome to the Citizenship Study Assistant. Ask me a question and I will answer it from the documents loaded.\n")
+    # Provide introduction and list loaded document sources
+    print("\nWelcome to the Citizenship Study Assistant. Ask me a question and I will answer it using both the base LLM and the RAG-enhanced LLM.\n")
     document_data_sources = set()
     for doc_metadata in retriever.vectorstore.get()['metadatas']:
         document_data_sources.add(doc_metadata['source'])
     for doc in document_data_sources:
         print(f"  {doc}")
-    print()
 
     # Start the REPL
     while True:
@@ -91,12 +90,25 @@ def main():
                 print("Assistant: Goodbye!")
                 break
 
-            # Invoke the RAG chain with user input
-            result = rag_chain.invoke(user_input)
-            print("Assistant:", result)
+            # Invoke both the base LLM and the RAG chain with user input
+            llm_response = llm.invoke(user_input)
+            rag_response = rag_chain.invoke(user_input)
+
+            # Extract content from base LLM response
+            llm_result = llm_response.content if hasattr(llm_response, 'content') else str(llm_response)
+
+            # Print both results for comparison
+            print("\n=== Results Comparison ===")
+            print("Base LLM Response:")
+            print(llm_result)
+            print("\nRAG LLM Response:")
+            print(rag_response)
+            print("=========================\n")
+
         except (KeyboardInterrupt, EOFError):
             print("\nAssistant: Goodbye!")
             break
+
 
 if __name__ == '__main__':
     main()
