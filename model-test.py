@@ -12,13 +12,15 @@ from langchain.chains import ConversationalRetrievalChain
 from langchain.memory import ConversationBufferMemory
 
 
-# Get environment variables
-api_key = os.environ.get("API_KEY")
+#print(os.getenv("OPENAI_API_KEY"))
 
 # Load documents
 def load_documents(directory_path):
     loader = PyPDFDirectoryLoader(directory_path)
     documents = loader.load()
+    if not documents:
+        raise ValueError("No documents were loaded. Check the directory path and ensure PDF files are present.")
+    print(f"Loaded {len(documents)} documents.")
     return documents
 
 # Split documents into chunks
@@ -28,56 +30,26 @@ def split_documents(documents):
         chunk_overlap=200
     )
     splits = text_splitter.split_documents(documents)
+    if not splits:
+        raise ValueError("No splits were created. Check the document contents and text splitting parameters.")
+    print(f"Split into {len(splits)} chunks.")
     return splits
 
-# Create Chroma vector database
+# Create the vectorstore using OpenAI embeddings and Chroma
 def create_vectorstore(splits):
     embeddings = OpenAIEmbeddings()
-    vectorstore = Chroma.from_documents(splits, embeddings)
+    vectorstore = Chroma.from_documents(
+        documents=splits,
+        embedding=embeddings,
+        persist_directory="./citizenship_data/.chromadb"
+    )
+    print("Vectorstore created successfully.")
     return vectorstore
 
-# Create retriever with query transformations
-def create_retriever(vectorstore):
-    retriever = vectorstore.as_retriever()
-
-    # Prompt for generating alternative queries
-    prompt_template = """You are an AI assistant. Generate three different versions of the given user question to retrieve relevant documents from a vector database.
-
-Original question: {question}
-"""
-    multi_query_prompt = ChatPromptTemplate.from_template(prompt_template)
-
-    llm = ChatOpenAI(temperature=0)
-
-    multi_query_retriever = MultiQueryRetriever(
-        retriever=retriever,
-        llm=llm,
-        prompt=multi_query_prompt
-    )
-
-    return multi_query_retriever
-
-# Create the conversational retrieval chain
-def create_conversational_chain(retriever):
-    llm = ChatOpenAI(temperature=0)
-    memory = ConversationBufferMemory(memory_key="chat_history", return_messages=True)
-    conversational_chain = ConversationalRetrievalChain(
-        retriever=retriever,
-        memory=memory,
-        combine_docs_chain_kwargs={'prompt': ChatPromptTemplate.from_template("""
-Use the following pieces of context to answer the question at the end. If you don't know the answer, just say that you don't know; don't try to make up an answer.
-
-{context}
-
-Question: {question}
-""")}
-    )
-    return conversational_chain
-
-
 def main():
+
     # Load documents
-    directory_path = "documents"
+    directory_path = './documents'
     print("Loading documents...")
     documents = load_documents(directory_path)
 
@@ -89,26 +61,45 @@ def main():
     print("Creating vectorstore...")
     vectorstore = create_vectorstore(splits)
 
-    # Create retriever
-    print("Creating retriever...")
-    retriever = create_retriever(vectorstore)
+    # Set up the retriever and prompt
+    retriever = vectorstore.as_retriever()
+    prompt = hub.pull("rlm/rag-prompt")
 
-    # Create conversational chain
-    print("Setting up conversational chain...")
-    chain = create_conversational_chain(retriever)
+    # Initialize LLM
+    llm = ChatOpenAI(model_name="gpt-3.5-turbo", temperature=0)
 
-    print("\nWelcome to the Citizenship Study Assistant. You can start asking questions now.\n")
+    # Define document formatting function
+    def format_docs(docs):
+        return "\n\n".join(doc.page_content for doc in docs)
 
-    # Start the REPL loop
+    # Define RAG chain
+    rag_chain = (
+        {"context": retriever | format_docs, "question": RunnablePassthrough()}
+        | prompt
+        | llm
+        | StrOutputParser()
+    )
+
+    # Introduction, list loaded document sources
+    print("\nWelcome to the Citizenship Study Assistant. Ask me a question and I will answer it from the documents loaded.\n")
+    document_data_sources = set()
+    for doc_metadata in retriever.vectorstore.get()['metadatas']:
+        document_data_sources.add(doc_metadata['source'])
+    for doc in document_data_sources:
+        print(f"  {doc}")
+    print()
+
+    # Start the REPL
     while True:
         try:
-            user_input = input("You: ")
+            user_input = input("llm>> ")
             if user_input.lower() in ['exit', 'quit']:
                 print("Assistant: Goodbye!")
                 break
-            # Get the response from the chain
-            response = chain({"question": user_input})
-            print("Assistant:", response["answer"])
+
+            # Invoke the RAG chain with user input
+            result = rag_chain.invoke(user_input)
+            print("Assistant:", result)
         except (KeyboardInterrupt, EOFError):
             print("\nAssistant: Goodbye!")
             break
