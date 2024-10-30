@@ -4,3 +4,5 @@ langchain_openai
 openai
 chromadb
 tiktoken
+pypdf
+cryptography
