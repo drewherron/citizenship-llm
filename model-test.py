@@ -1,18 +1,12 @@
 import os
-import sys
-from langchain_community.document_loaders import PyPDFDirectoryLoader
+from langchain import hub
 from langchain.text_splitter import RecursiveCharacterTextSplitter
-#from langchain_community.embeddings import OpenAIEmbeddings
-from langchain_openai import OpenAIEmbeddings
+from langchain_openai import OpenAIEmbeddings, ChatOpenAI
 from langchain_community.vectorstores import Chroma
+from langchain_core.output_parsers import StrOutputParser
+from langchain_core.runnables import RunnablePassthrough
 from langchain.prompts import ChatPromptTemplate
-from langchain_community.chat_models import ChatOpenAI
-from langchain.retrievers import MultiQueryRetriever
-from langchain.chains import ConversationalRetrievalChain
-from langchain.memory import ConversationBufferMemory
-
-
-#print(os.getenv("OPENAI_API_KEY"))
+from langchain_community.document_loaders import PyPDFDirectoryLoader
 
 # Load documents
 def load_documents(directory_path):
@@ -41,7 +35,7 @@ def create_vectorstore(splits):
     vectorstore = Chroma.from_documents(
         documents=splits,
         embedding=embeddings,
-        persist_directory="./citizenship_data/.chromadb"
+        persist_directory=".chromadb"
     )
     print("Vectorstore created successfully.")
     return vectorstore
