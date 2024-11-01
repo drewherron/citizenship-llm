@@ -90,8 +90,16 @@ def main():
                 print("Assistant: Goodbye!")
                 break
 
+            # Add a bit of context for the base LLM
+            context_prompt = (
+                "This is a question related to U.S. citizenship, naturalization, and/or the citizenship exam.\n\n"
+            )
+
+            # Concatenate context with user input for the base LLM
+            base_prompt = context_prompt + user_input
+
             # Invoke both the base LLM and the RAG chain with user input
-            llm_response = llm.invoke(user_input)
+            llm_response = llm.invoke(base_prompt)
             rag_response = rag_chain.invoke(user_input)
 
             # Extract content from base LLM response
