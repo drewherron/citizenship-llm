@@ -60,8 +60,8 @@ def main():
     vectorstore = create_vectorstore(splits)
 
     # Set up the retriever and prompt
-    prompt = hub.pull("rlm/rag-prompt")
     retriever = vectorstore.as_retriever(search_kwargs={"k": 3})
+    #prompt = hub.pull("rlm/rag-prompt")
 
     # Initialize LLM (you could use GoogleGenerativeAI or OpenAI)
     llm = ChatOpenAI(model_name="gpt-3.5-turbo", temperature=0)
@@ -71,6 +71,25 @@ def main():
 
     # Initialize memory for RAG LLM
     rag_memory = ConversationBufferMemory(memory_key="chat_history", return_messages=True)
+
+    # A prompt for the base LLM
+    base_prompt_template = ChatPromptTemplate.from_template("""
+You are an assistant helping with U.S. citizenship, naturalization, and the citizenship exam.
+
+{chat_history}
+User: {user_input}
+Assistant:""")
+
+    rag_prompt_template = ChatPromptTemplate.from_template("""
+
+You are an assistant helping with U.S. citizenship, naturalization, and the citizenship exam.
+
+Context:
+{context}
+
+{chat_history}
+Human: {user_input}
+Assistant:""")
 
     # Define RAG chain
     rag_chain = (
@@ -87,6 +106,7 @@ def main():
         document_data_sources.add(doc_metadata['source'])
     for doc in document_data_sources:
         print(f"  {doc}")
+    print()
 
     # Start the REPL
     while True:
@@ -96,13 +116,8 @@ def main():
                 print("Assistant: Goodbye!")
                 break
 
-            # Add a bit of context for the base LLM
-            context_prompt = (
-                "This is a question related to U.S. citizenship, naturalization, and/or the citizenship exam.\n\n"
-            )
-
-            # Concatenate context with user input for the base LLM
-            base_prompt = context_prompt + user_input
+            # For base LLM, we use the base_llm_chain with memory
+            base_response = base_llm_chain.predict(user_input=user_input)
 
             # Invoke both the base LLM and the RAG chain with user input
             llm_response = llm.invoke(base_prompt)
