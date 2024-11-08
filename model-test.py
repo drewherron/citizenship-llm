@@ -1,4 +1,5 @@
 import os
+import warnings
 from langchain import hub
 from langchain.text_splitter import RecursiveCharacterTextSplitter
 from langchain_openai import OpenAIEmbeddings, ChatOpenAI
@@ -11,6 +12,9 @@ from langchain.prompts import ChatPromptTemplate
 from langchain_community.document_loaders import PyPDFLoader
 from langchain.chains import LLMChain
 
+
+# I know we're getting a LangChainDeprecationWarning, it doesn't matter for this project. Adding this line to suppress the warning for cleaner output.
+warnings.filterwarnings("ignore", category=DeprecationWarning, message="Please see the migration guide")
 
 # Load documents
 def load_documents(directory_path):
