@@ -4,9 +4,13 @@ from langchain.text_splitter import RecursiveCharacterTextSplitter
 from langchain_openai import OpenAIEmbeddings, ChatOpenAI
 from langchain_community.vectorstores import Chroma
 from langchain_core.output_parsers import StrOutputParser
-from langchain_core.runnables import RunnablePassthrough
+from langchain_core.runnables import RunnablePassthrough, RunnableMap
+from langchain.memory import ConversationBufferMemory
 from langchain.prompts import ChatPromptTemplate
-from langchain_community.document_loaders import PyPDFDirectoryLoader
+#from langchain_community.document_loaders import PyPDFDirectoryLoader
+from langchain_community.document_loaders import PyPDFLoader
+from langchain.chains import LLMChain
+
 
 # Load documents
 def load_documents(directory_path):
