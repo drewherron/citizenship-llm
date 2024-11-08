@@ -60,8 +60,8 @@ def main():
     vectorstore = create_vectorstore(splits)
 
     # Set up the retriever and prompt
-    retriever = vectorstore.as_retriever()
     prompt = hub.pull("rlm/rag-prompt")
+    retriever = vectorstore.as_retriever(search_kwargs={"k": 3})
 
     # Initialize LLM (you could use GoogleGenerativeAI or OpenAI)
     llm = ChatOpenAI(model_name="gpt-3.5-turbo", temperature=0)
