@@ -5,12 +5,10 @@ from langchain.text_splitter import RecursiveCharacterTextSplitter
 from langchain_openai import OpenAIEmbeddings, ChatOpenAI
 from langchain_community.vectorstores import Chroma
 from langchain_core.output_parsers import StrOutputParser
-from langchain_core.runnables import RunnablePassthrough, RunnableMap
+from langchain_core.runnables import RunnablePassthrough, RunnableMap, RunnableSequence
 from langchain.memory import ConversationBufferMemory
 from langchain.prompts import ChatPromptTemplate
-#from langchain_community.document_loaders import PyPDFDirectoryLoader
 from langchain_community.document_loaders import PyPDFLoader
-from langchain.chains import LLMChain
 
 
 # I know we're getting a LangChainDeprecationWarning, it doesn't matter for this project. Adding this line to suppress the warning for cleaner output.
@@ -106,29 +104,41 @@ Context:
 User: {user_input}
 Assistant:""")
 
-    # Create base LLM chain
-    base_llm_chain = LLMChain(
-        llm=llm,
-        prompt=base_prompt_template,
-        memory=base_memory
-    )
+    # Function to get chat history for base LLM
+    def get_chat_history_base(_):
+        return base_memory.load_memory_variables({})["chat_history"]
 
-    # Function to get chat history
-    def get_chat_history(_):
+    # Function to get chat history for RAG LLM
+    def get_chat_history_rag(_):
         return rag_memory.load_memory_variables({})["chat_history"]
 
     # Function to get context
     def get_context(inputs):
         return format_docs(
-            retriever.get_relevant_documents(inputs["user_input"])
+            retriever.invoke(inputs["user_input"])
         )
+
+    # Provide introduction and list loaded document sources
+    print("\nWelcome to the Citizenship Study Assistant.\n")
+    document_data_sources = set()
+    for doc_metadata in retriever.vectorstore.get()['metadatas']:
+        document_data_sources.add(doc_metadata['source'])
+    for doc in document_data_sources:
+        print(f"  {doc}")
+    print()
+
+    # Create base LLM chain
+    base_llm_chain = RunnableSequence(
+        base_prompt_template,
+        llm
+    )
 
     # Create RAG chain
     rag_chain = (
         RunnableMap(
             {
                 "user_input": RunnablePassthrough(),
-                "chat_history": get_chat_history,
+                "chat_history": get_chat_history_rag,
                 "context": get_context,
             }
         )
@@ -136,15 +146,6 @@ Assistant:""")
         | llm
         | StrOutputParser()
     )
-
-    # Provide introduction and list loaded document sources
-    print("\nWelcome to the Citizenship Study Assistant with memory.\n")
-    document_data_sources = set()
-    for doc_metadata in retriever.vectorstore.get()['metadatas']:
-        document_data_sources.add(doc_metadata['source'])
-    for doc in document_data_sources:
-        print(f"  {doc}")
-    print()
 
     # Start the REPL
     while True:
@@ -154,10 +155,19 @@ Assistant:""")
                 print("Assistant: Goodbye!")
                 break
 
-            # For base LLM: base_llm_chain with user_input
-            base_response = base_llm_chain.predict(user_input=user_input)
+            # Invoke base_llm_chain
+            base_response = base_llm_chain.invoke({
+                "user_input": user_input,
+                "chat_history": get_chat_history_base(None)
+            })
 
-            # For RAG LLM: rag_chain with user_input
+            # Extract Base LLM response
+            base_response_content = base_response.content if hasattr(base_response, 'content') else str(base_response)
+
+            # Update the memory for the Base LLM
+            base_memory.save_context({"user_input": user_input}, {"output": base_response_content})
+
+            # Invoke rag_chain
             rag_response = rag_chain.invoke({"user_input": user_input})
 
             # Update the memory for the RAG LLM
@@ -166,7 +176,7 @@ Assistant:""")
             # Print both results for comparison
             print("\n=== Results Comparison ===")
             print("Base LLM Response:")
-            print(base_response)
+            print(base_response_content)
             print("\nRAG LLM Response:")
             print(rag_response)
             print("=========================\n")
