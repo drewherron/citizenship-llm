@@ -59,7 +59,6 @@ def create_vectorstore(splits):
     return vectorstore
 
 def main():
-
     # Load documents
     directory_path = './documents'
     print("Loading documents...")
@@ -73,11 +72,10 @@ def main():
     print("Creating vectorstore...")
     vectorstore = create_vectorstore(splits)
 
-    # Set up the retriever and prompt
+    # Set up the retriever
     retriever = vectorstore.as_retriever(search_kwargs={"k": 3})
-    #prompt = hub.pull("rlm/rag-prompt")
 
-    # Initialize LLM (you could use GoogleGenerativeAI or OpenAI)
+    # Initialize LLM
     llm = ChatOpenAI(model_name="gpt-3.5-turbo", temperature=0)
 
     # Initialize memory for base LLM
@@ -86,7 +84,7 @@ def main():
     # Initialize memory for RAG LLM
     rag_memory = ConversationBufferMemory(memory_key="chat_history", return_messages=True)
 
-    # A prompt for the base LLM
+    # Create prompt templates
     base_prompt_template = ChatPromptTemplate.from_template("""
 You are an assistant helping with U.S. citizenship, naturalization, and the citizenship exam.
 
@@ -132,7 +130,7 @@ Assistant:""")
     )
 
     # Provide introduction and list loaded document sources
-    print("\nWelcome to the Citizenship Study Assistant. Ask me a question and I will answer it using both the base LLM and the RAG-enhanced LLM.\n")
+    print("\nWelcome to the Citizenship Study Assistant with memory. Ask me a question, and I will remember our conversation.\n")
     document_data_sources = set()
     for doc_metadata in retriever.vectorstore.get()['metadatas']:
         document_data_sources.add(doc_metadata['source'])
@@ -148,20 +146,23 @@ Assistant:""")
                 print("Assistant: Goodbye!")
                 break
 
-            # For base LLM, we use the base_llm_chain with memory
+            # For base LLM: base_llm_chain with user_input
             base_response = base_llm_chain.predict(user_input=user_input)
 
-            # Invoke both the base LLM and the RAG chain with user input
-            llm_response = llm.invoke(base_prompt)
-            rag_response = rag_chain.invoke(user_input)
+            # For RAG LLM: rag_chain with user_input and chat_history
+            rag_inputs = {
+                "user_input": user_input,
+                "chat_history": rag_memory.load_memory_variables({})["chat_history"]
+            }
+            rag_response = rag_chain.invoke(rag_inputs)
 
-            # Extract content from base LLM response
-            llm_result = llm_response.content if hasattr(llm_response, 'content') else str(llm_response)
+            # Update the memory for the RAG LLM
+            rag_memory.save_context({"user_input": user_input}, {"output": rag_response})
 
             # Print both results for comparison
             print("\n=== Results Comparison ===")
             print("Base LLM Response:")
-            print(llm_result)
+            print(base_response)
             print("\nRAG LLM Response:")
             print(rag_response)
             print("=========================\n")
