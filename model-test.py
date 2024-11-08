@@ -81,20 +81,38 @@ User: {user_input}
 Assistant:""")
 
     rag_prompt_template = ChatPromptTemplate.from_template("""
-
 You are an assistant helping with U.S. citizenship, naturalization, and the citizenship exam.
 
 Context:
 {context}
 
 {chat_history}
-Human: {user_input}
+User: {user_input}
 Assistant:""")
 
-    # Define RAG chain
+    # Create base LLM chain
+    base_llm_chain = LLMChain(
+        llm=llm,
+        prompt=base_prompt_template,
+        memory=base_memory
+    )
+
+    # Create RAG chain
     rag_chain = (
-        {"context": retriever | format_docs, "question": RunnablePassthrough()}
-        | prompt
+        {
+            "user_input": RunnablePassthrough(),
+            "chat_history": rag_memory
+        }
+        | RunnableMap(
+            {
+                "context": lambda inputs: format_docs(
+                    retriever.get_relevant_documents(inputs["user_input"])
+                ),
+                "user_input": lambda inputs: inputs["user_input"],
+                "chat_history": lambda inputs: inputs["chat_history"],
+            }
+        )
+        | rag_prompt_template
         | llm
         | StrOutputParser()
     )
