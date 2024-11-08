@@ -14,11 +14,21 @@ from langchain.chains import LLMChain
 
 # Load documents
 def load_documents(directory_path):
-    loader = PyPDFDirectoryLoader(directory_path)
-    documents = loader.load()
+    documents = []
+    for filename in os.listdir(directory_path):
+        if filename.endswith(".pdf"):
+            filepath = os.path.join(directory_path, filename)
+            loader = PyPDFLoader(filepath)
+            docs = loader.load()
+            documents.extend(docs)
     if not documents:
         raise ValueError("No documents were loaded. Check the directory path and ensure PDF files are present.")
     print(f"Loaded {len(documents)} documents.")
+    i = 1
+    #for document in documents:
+    #    print(f"Document {i}:")
+    #    print(document)
+    #    i += 1
     return documents
 
 # Split documents into chunks
