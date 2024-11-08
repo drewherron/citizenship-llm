@@ -24,7 +24,7 @@ def load_documents(directory_path):
     if not documents:
         raise ValueError("No documents were loaded. Check the directory path and ensure PDF files are present.")
     print(f"Loaded {len(documents)} documents.")
-    i = 1
+    #i = 1
     #for document in documents:
     #    print(f"Document {i}:")
     #    print(document)
@@ -109,19 +109,23 @@ Assistant:""")
         memory=base_memory
     )
 
+    # Function to get chat history
+    def get_chat_history(_):
+        return rag_memory.load_memory_variables({})["chat_history"]
+
+    # Function to get context
+    def get_context(inputs):
+        return format_docs(
+            retriever.get_relevant_documents(inputs["user_input"])
+        )
+
     # Create RAG chain
     rag_chain = (
-        {
-            "user_input": RunnablePassthrough(),
-            "chat_history": rag_memory
-        }
-        | RunnableMap(
+        RunnableMap(
             {
-                "context": lambda inputs: format_docs(
-                    retriever.get_relevant_documents(inputs["user_input"])
-                ),
-                "user_input": lambda inputs: inputs["user_input"],
-                "chat_history": lambda inputs: inputs["chat_history"],
+                "user_input": RunnablePassthrough(),
+                "chat_history": get_chat_history,
+                "context": get_context,
             }
         )
         | rag_prompt_template
@@ -130,7 +134,7 @@ Assistant:""")
     )
 
     # Provide introduction and list loaded document sources
-    print("\nWelcome to the Citizenship Study Assistant with memory. Ask me a question, and I will remember our conversation.\n")
+    print("\nWelcome to the Citizenship Study Assistant with memory.\n")
     document_data_sources = set()
     for doc_metadata in retriever.vectorstore.get()['metadatas']:
         document_data_sources.add(doc_metadata['source'])
@@ -149,12 +153,8 @@ Assistant:""")
             # For base LLM: base_llm_chain with user_input
             base_response = base_llm_chain.predict(user_input=user_input)
 
-            # For RAG LLM: rag_chain with user_input and chat_history
-            rag_inputs = {
-                "user_input": user_input,
-                "chat_history": rag_memory.load_memory_variables({})["chat_history"]
-            }
-            rag_response = rag_chain.invoke(rag_inputs)
+            # For RAG LLM: rag_chain with user_input
+            rag_response = rag_chain.invoke({"user_input": user_input})
 
             # Update the memory for the RAG LLM
             rag_memory.save_context({"user_input": user_input}, {"output": rag_response})
