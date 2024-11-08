@@ -66,6 +66,12 @@ def main():
     # Initialize LLM (you could use GoogleGenerativeAI or OpenAI)
     llm = ChatOpenAI(model_name="gpt-3.5-turbo", temperature=0)
 
+    # Initialize memory for base LLM
+    base_memory = ConversationBufferMemory(memory_key="chat_history", return_messages=True)
+
+    # Initialize memory for RAG LLM
+    rag_memory = ConversationBufferMemory(memory_key="chat_history", return_messages=True)
+
     # Define RAG chain
     rag_chain = (
         {"context": retriever | format_docs, "question": RunnablePassthrough()}
