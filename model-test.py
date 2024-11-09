@@ -11,11 +11,24 @@ from langchain.prompts import ChatPromptTemplate
 from langchain_community.document_loaders import PyPDFLoader
 
 
-# I know we're getting a LangChainDeprecationWarning, it doesn't matter for this project. Adding this line to suppress the warning for cleaner output.
+# I know we're getting a LangChainDeprecationWarning, it doesn't really matter for this project.
+# This line suppresses the warning for cleaner output.
 warnings.filterwarnings("ignore", category=DeprecationWarning, message="Please see the migration guide")
 
 # Load documents
 def load_documents(directory_path):
+    """
+    Loads all PDF documents from the specified directory and returns them as a list of Document objects.
+
+    Args:
+        directory_path (str): The path to the directory containing PDF files.
+
+    Returns:
+        list: A list of Document objects loaded from the PDFs.
+
+    Raises:
+        ValueError: If no documents are loaded from the specified directory.
+    """
     documents = []
     for filename in os.listdir(directory_path):
         if filename.endswith(".pdf"):
@@ -26,15 +39,22 @@ def load_documents(directory_path):
     if not documents:
         raise ValueError("No documents were loaded. Check the directory path and ensure PDF files are present.")
     print(f"Loaded {len(documents)} documents.")
-    #i = 1
-    #for document in documents:
-    #    print(f"Document {i}:")
-    #    print(document)
-    #    i += 1
     return documents
 
 # Split documents into chunks
 def split_documents(documents):
+    """
+    Splits the provided documents into smaller chunks using a recursive character text splitter.
+
+    Args:
+        documents (list): A list of Document objects to be split into chunks.
+
+    Returns:
+        list: A list of Document chunks after splitting.
+
+    Raises:
+        ValueError: If no splits are created from the documents.
+    """
     text_splitter = RecursiveCharacterTextSplitter(
         chunk_size=1000,
         chunk_overlap=200
@@ -47,10 +67,31 @@ def split_documents(documents):
 
 # Define document formatting function
 def format_docs(docs):
+    """
+    Formats a list of Document objects into a single string, separating each document's content with two newlines.
+
+    Args:
+        docs (list): A list of Document objects to format.
+
+    Returns:
+        str: A formatted string containing the content of all documents.
+    """
     return "\n\n".join(doc.page_content for doc in docs)
 
 # Create the vectorstore using OpenAI embeddings and Chroma
 def create_vectorstore(splits):
+    """
+    Creates a vectorstore from the provided document splits using OpenAI embeddings and Chroma.
+
+    Args:
+        splits (list): A list of Document chunks to be embedded and stored.
+
+    Returns:
+        Chroma: An instance of the Chroma vectorstore containing the document embeddings.
+
+    Prints:
+        str: A message confirming successful creation of the vectorstore.
+    """
     embeddings = OpenAIEmbeddings()
     vectorstore = Chroma.from_documents(
         documents=splits,
@@ -106,26 +147,54 @@ Assistant:""")
 
     # Function to get chat history for base LLM
     def get_chat_history_base(_):
+        """
+        Retrieves the conversation history from the base language model's memory.
+
+        Args:
+            _ : Placeholder argument (not used).
+
+        Returns:
+            list: A list of messages representing the chat history from the base model.
+        """
         return base_memory.load_memory_variables({})["chat_history"]
 
     # Function to get chat history for RAG LLM
     def get_chat_history_rag(_):
+        """
+        Retrieves the conversation history from the RAG-enhanced language model's memory.
+
+        Args:
+            _ : Placeholder argument (not used).
+
+        Returns:
+            list: A list of messages representing the chat history from the RAG model.
+        """
         return rag_memory.load_memory_variables({})["chat_history"]
 
     # Function to get context
     def get_context(inputs):
+        """
+        Retrieves relevant context documents based on the user's input by querying the retriever.
+
+        Args:
+            inputs (dict): A dictionary containing the user's input under the key "user_input".
+
+        Returns:
+            str: A formatted string of relevant documents to be used as context in the prompt.
+        """
         return format_docs(
             retriever.invoke(inputs["user_input"])
         )
 
-    # Provide introduction and list loaded document sources
-    print("\nWelcome to the Citizenship Study Assistant.\n")
+    # List loaded document sources
     document_data_sources = set()
     for doc_metadata in retriever.vectorstore.get()['metadatas']:
         document_data_sources.add(doc_metadata['source'])
+    print("\nDocuments loaded:")
     for doc in document_data_sources:
         print(f"  {doc}")
-    print()
+
+    print("\nWelcome to the Citizenship Study Assistant.\n")
 
     # Create base LLM chain
     base_llm_chain = RunnableSequence(
@@ -150,7 +219,7 @@ Assistant:""")
     # Start the REPL
     while True:
         try:
-            user_input = input("llm>> ")
+            user_input = input("Query >> ")
             if user_input.lower() in ['exit', 'quit']:
                 print("Assistant: Goodbye!")
                 break
