@@ -96,7 +96,6 @@ def create_vectorstore(splits):
     vectorstore = Chroma.from_documents(
         documents=splits,
         embedding=embeddings,
-        persist_directory=".chromadb"
     )
     print("Vectorstore created successfully.")
     return vectorstore
