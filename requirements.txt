@@ -6,3 +6,5 @@ chromadb
 tiktoken
 pypdf
 cryptography
+langchain_google_genai
+langchain_anthropic
