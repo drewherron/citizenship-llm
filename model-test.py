@@ -41,7 +41,7 @@ def load_documents(directory_path):
             documents.extend(docs)
     if not documents:
         raise ValueError("No documents were loaded. Check the directory path and ensure PDF files are present.")
-    print(f"Loaded {len(documents)} documents.")
+    print(f"Loaded {len(set(doc.metadata['source'] for doc in documents))} documents.")
     return documents
 
 # Split documents into chunks
