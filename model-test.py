@@ -9,6 +9,9 @@ from langchain_core.runnables import RunnablePassthrough, RunnableMap, RunnableS
 from langchain.memory import ConversationBufferMemory
 from langchain.prompts import ChatPromptTemplate
 from langchain_community.document_loaders import PyPDFLoader
+from langchain_google_genai import GoogleGenerativeAIEmbeddings
+from langchain_google_genai import ChatGoogleGenerativeAI
+from langchain_anthropic import ChatAnthropic
 
 
 # I know we're getting a LangChainDeprecationWarning, it doesn't really matter for this project.
@@ -79,12 +82,13 @@ def format_docs(docs):
     return "\n\n".join(doc.page_content for doc in docs)
 
 # Create the vectorstore using OpenAI embeddings and Chroma
-def create_vectorstore(splits):
+def create_vectorstore(splits, model_choice):
     """
-    Creates a vectorstore from the provided document splits using OpenAI embeddings and Chroma.
+    Creates a vectorstore from the provided document splits using embeddings and Chroma.
 
     Args:
         splits (list): A list of Document chunks to be embedded and stored.
+        model_choice (str): The selected LLM model.
 
     Returns:
         Chroma: An instance of the Chroma vectorstore containing the document embeddings.
@@ -92,7 +96,15 @@ def create_vectorstore(splits):
     Prints:
         str: A message confirming successful creation of the vectorstore.
     """
-    embeddings = OpenAIEmbeddings()
+    if model_choice == "1":
+        embeddings = OpenAIEmbeddings()
+    elif model_choice == "2":
+        embeddings = GoogleGenerativeAIEmbeddings(model="models/embedding-001", task_type="retrieval_query")
+    elif model_choice == "3":
+        embeddings = OpenAIEmbeddings()
+    else:
+        raise ValueError("Invalid model choice for embeddings.")
+
     vectorstore = Chroma.from_documents(
         documents=splits,
         embedding=embeddings,
@@ -101,6 +113,31 @@ def create_vectorstore(splits):
     return vectorstore
 
 def main():
+
+    model_names = {
+        "1": "gpt-3.5-turbo",
+        "2": "gemini-1.5-pro",
+        "3": "claude-3-sonnet-20240229"
+    }
+
+    llm = None
+    while llm is None:
+        print("Select LLM model:")
+        for key, name in model_names.items():
+            print(f"{key}. {name}")
+        choice = input("Enter the number of the model you want to use: ")
+
+        if choice == "1":
+            llm = ChatOpenAI(model_name="gpt-3.5-turbo", temperature=0)
+        elif choice == "2":
+            llm = ChatGoogleGenerativeAI(model="gemini-1.5-pro")
+        elif choice == "3":
+            llm = ChatAnthropic(model="claude-3-sonnet-20240229")
+        else:
+            print("Invalid choice. Try again.")
+
+    model_name = model_names.get(choice)
+
     # Load documents
     directory_path = './documents'
     print("Loading documents...")
@@ -112,13 +149,10 @@ def main():
 
     # Create vectorstore
     print("Creating vectorstore...")
-    vectorstore = create_vectorstore(splits)
+    vectorstore = create_vectorstore(splits, choice)
 
     # Set up the retriever
     retriever = vectorstore.as_retriever(search_kwargs={"k": 3})
-
-    # Initialize LLM
-    llm = ChatOpenAI(model_name="gpt-3.5-turbo", temperature=0)
 
     # Initialize memory for base LLM
     base_memory = ConversationBufferMemory(memory_key="chat_history", return_messages=True)
@@ -193,7 +227,8 @@ Assistant:""")
     for doc in document_data_sources:
         print(f"  {doc}")
 
-    print("\nWelcome to the Citizenship Study Assistant.\n")
+    print("\nWelcome to the Citizenship Study Assistant.")
+    print("Type 'exit' or 'quit' to end the session.\n")
 
     # Create base LLM chain
     base_llm_chain = RunnableSequence(
@@ -242,7 +277,7 @@ Assistant:""")
             rag_memory.save_context({"user_input": user_input}, {"output": rag_response})
 
             # Print both results for comparison
-            print("\n=== Results Comparison ===")
+            print(f"\n=== {model_name} ===")
             print("Base LLM Response:")
             print(base_response_content)
             print("\nRAG LLM Response:")
