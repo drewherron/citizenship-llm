@@ -277,12 +277,12 @@ Assistant:""")
             rag_memory.save_context({"user_input": user_input}, {"output": rag_response})
 
             # Print both results for comparison
-            print(f"\n=== {model_name} ===")
+            print(f"\n============== {model_name} ==============")
             print("Base LLM Response:")
             print(base_response_content)
             print("\nRAG LLM Response:")
             print(rag_response)
-            print("=========================\n")
+            print("============================================\n")
 
         except (KeyboardInterrupt, EOFError):
             print("\nAssistant: Goodbye!")
