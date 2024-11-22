@@ -9,7 +9,7 @@ from langchain_core.output_parsers import StrOutputParser
 from langchain_core.runnables import RunnablePassthrough, RunnableMap, RunnableSequence
 from langchain.memory import ConversationBufferMemory
 from langchain.prompts import ChatPromptTemplate
-from langchain_community.document_loaders import PyPDFLoader
+from langchain_community.document_loaders import PyPDFLoader, DirectoryLoader, TextLoader
 from langchain_google_genai import GoogleGenerativeAIEmbeddings
 from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain_anthropic import ChatAnthropic
@@ -20,7 +20,8 @@ from langchain_anthropic import ChatAnthropic
 warnings.filterwarnings("ignore", category=DeprecationWarning, message="Please see the migration guide")
 
 # Load documents
-def load_documents(directory_path):
+
+def load_pdf_documents(directory_path):
     """
     Loads all PDF documents from the specified directory and returns them as a list of Document objects.
 
@@ -33,6 +34,10 @@ def load_documents(directory_path):
     Raises:
         ValueError: If no documents are loaded from the specified directory.
     """
+    if not os.path.exists(directory_path):
+        print(f"Directory not found: '{directory_path}'. Skipping TXT document loading.")
+        return []
+
     documents = []
     for filename in os.listdir(directory_path):
         if filename.endswith(".pdf"):
@@ -42,7 +47,38 @@ def load_documents(directory_path):
             documents.extend(docs)
     if not documents:
         raise ValueError("No documents were loaded. Check the directory path and ensure PDF files are present.")
-    print(f"Loaded {len(set(doc.metadata['source'] for doc in documents))} documents.")
+    print(f"Loaded {len(set(doc.metadata['source'] for doc in documents))} PDF documents.")
+    return documents
+
+def load_txt_documents(directory_path):
+    """
+    Loads all TXT documents from the specified directory and returns them as a list of Document objects.
+
+    Args:
+        directory_path (str): The path to the directory containing TXT files.
+
+    Returns:
+        list: A list of Document objects loaded from the TXT files.
+    """
+    if not os.path.exists(directory_path):
+        print(f"Directory not found: '{directory_path}'. Skipping TXT document loading.")
+        return []
+
+    documents = DirectoryLoader(
+        directory_path,
+        glob="**/*.txt",
+        loader_cls=TextLoader,
+        loader_kwargs={"encoding": "utf8"}
+    ).load()
+
+    if not documents:
+        print("No TXT documents were loaded. Check the directory path and ensure TXT files are present.")
+    else:
+        # Adjust the source paths to include './' at the beginning
+        for doc in documents:
+            if not doc.metadata['source'].startswith('./'):
+                doc.metadata['source'] = './' + doc.metadata['source']
+        print(f"Loaded {len(documents)} TXT documents.")
     return documents
 
 # Split documents into chunks
@@ -126,7 +162,7 @@ def main():
         print("Select LLM model:")
         for key, name in model_names.items():
             print(f"{key}. {name}")
-        choice = input("Enter the number of the model you want to use: ")
+        choice = input("Choose the model you want to use: ")
 
         if choice == "1":
             llm = ChatOpenAI(model_name="gpt-3.5-turbo", temperature=0)
@@ -140,10 +176,29 @@ def main():
     model_name = model_names.get(choice)
     output_filename = f"{model_name}-{datetime.now().strftime('%Y%m%d-%H%M%S')}.txt"
 
-    # Load documents
-    directory_path = './documents'
-    print("Loading documents...")
-    documents = load_documents(directory_path)
+    # Prompt user to select document types to load
+    documents = []
+    while not documents:
+        print("\nSelect document types to load:")
+        print("1. PDF only")
+        print("2. PDF and TXT files")
+        doc_choice = input("Choose the documents you want to load: ")
+
+        if doc_choice == "1":
+            print("\nLoading PDF documents...")
+            documents = load_pdf_documents('./documents')
+        elif doc_choice == "2":
+            print("\nLoading PDF documents...")
+            documents = load_pdf_documents('./documents')
+            print("Loading TXT documents...")
+            documents.extend(load_txt_documents('./documents'))
+        else:
+            print("Invalid choice. Try again.")
+
+    if not documents:
+        # I think we shouldn't ever be able to get here...
+        print("No documents were loaded. Exiting program.")
+        return
 
     # Split the documents
     print("Splitting documents...")
