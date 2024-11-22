@@ -1,5 +1,6 @@
 import os
 import warnings
+from datetime import datetime
 from langchain import hub
 from langchain.text_splitter import RecursiveCharacterTextSplitter
 from langchain_openai import OpenAIEmbeddings, ChatOpenAI
@@ -137,6 +138,7 @@ def main():
             print("Invalid choice. Try again.")
 
     model_name = model_names.get(choice)
+    output_filename = f"{model_name}-{datetime.now().strftime('%Y%m%d-%H%M%S')}.txt"
 
     # Load documents
     directory_path = './documents'
@@ -251,42 +253,49 @@ Assistant:""")
     )
 
     # Start the REPL
-    while True:
-        try:
-            user_input = input("Query >> ")
-            if user_input.lower() in ['exit', 'quit']:
-                print("Assistant: Goodbye!")
+    with open(output_filename, "a") as log_file:
+        while True:
+            try:
+                user_input = input("Query >> ")
+                if user_input.lower() in ['exit', 'quit']:
+                    print("Assistant: Goodbye!")
+                    break
+
+                # Invoke base_llm_chain
+                base_response = base_llm_chain.invoke({
+                    "user_input": user_input,
+                    "chat_history": get_chat_history_base(None)
+                })
+
+                # Extract Base LLM response
+                base_response_content = base_response.content if hasattr(base_response, 'content') else str(base_response)
+
+                # Update the memory for the Base LLM
+                base_memory.save_context({"user_input": user_input}, {"output": base_response_content})
+
+                # Invoke rag_chain
+                rag_response = rag_chain.invoke({"user_input": user_input})
+
+                # Update the memory for the RAG LLM
+                rag_memory.save_context({"user_input": user_input}, {"output": rag_response})
+
+                # Print both results for comparison
+                print(f"\n============== {model_name} ==============")
+                print("Base LLM Response:")
+                print(base_response_content)
+                print("\nRAG LLM Response:")
+                print(rag_response)
+                print("============================================\n")
+
+                # Append user input and responses to the log file
+                log_file.write(f"####  User:  ####\n{user_input}\n")
+                log_file.write(f"\n####  Base LLM Response:  #### \n{base_response_content}\n")
+                log_file.write(f"\n####  RAG LLM Response:  ####\n{rag_response}\n")
+                log_file.write("============================================\n\n")
+
+            except (KeyboardInterrupt, EOFError):
+                print("\nAssistant: Goodbye!")
                 break
-
-            # Invoke base_llm_chain
-            base_response = base_llm_chain.invoke({
-                "user_input": user_input,
-                "chat_history": get_chat_history_base(None)
-            })
-
-            # Extract Base LLM response
-            base_response_content = base_response.content if hasattr(base_response, 'content') else str(base_response)
-
-            # Update the memory for the Base LLM
-            base_memory.save_context({"user_input": user_input}, {"output": base_response_content})
-
-            # Invoke rag_chain
-            rag_response = rag_chain.invoke({"user_input": user_input})
-
-            # Update the memory for the RAG LLM
-            rag_memory.save_context({"user_input": user_input}, {"output": rag_response})
-
-            # Print both results for comparison
-            print(f"\n============== {model_name} ==============")
-            print("Base LLM Response:")
-            print(base_response_content)
-            print("\nRAG LLM Response:")
-            print(rag_response)
-            print("============================================\n")
-
-        except (KeyboardInterrupt, EOFError):
-            print("\nAssistant: Goodbye!")
-            break
 
 
 if __name__ == '__main__':
