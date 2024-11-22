@@ -288,9 +288,9 @@ Assistant:""")
                 print("============================================\n")
 
                 # Append user input and responses to the log file
-                log_file.write(f"####  User:  ####\n{user_input}\n")
+                log_file.write(f"  ####  User:               ####\n{user_input}\n")
                 log_file.write(f"\n####  Base LLM Response:  #### \n{base_response_content}\n")
-                log_file.write(f"\n####  RAG LLM Response:  ####\n{rag_response}\n")
+                log_file.write(f"\n####  RAG LLM Response:   ####\n{rag_response}\n")
                 log_file.write("============================================\n\n")
 
             except (KeyboardInterrupt, EOFError):
