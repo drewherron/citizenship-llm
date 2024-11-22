@@ -164,14 +164,14 @@ def main():
 
     # Create prompt templates
     base_prompt_template = ChatPromptTemplate.from_template("""
-You are an assistant helping with U.S. citizenship, naturalization, and the citizenship exam.
+You are an assistant helping with U.S. citizenship, naturalization, and the citizenship exam. Be a critical tutor and be fair but not so agreeable that your feedback is incorrect. The user wants to learn from their mistakes, and wants honest feedback.
 
 {chat_history}
 User: {user_input}
 Assistant:""")
 
     rag_prompt_template = ChatPromptTemplate.from_template("""
-You are an assistant helping with U.S. citizenship, naturalization, and the citizenship exam.
+You are an assistant helping with U.S. citizenship, naturalization, and the citizenship exam. Be a critical tutor and be fair but not so agreeable that your feedback is incorrect. The user wants to learn from their mistakes, and wants honest feedback.
 
 Context:
 {context}
