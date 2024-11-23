@@ -20,8 +20,6 @@ from langchain_anthropic import ChatAnthropic
 # This line suppresses the warning for cleaner output.
 warnings.filterwarnings("ignore", category=DeprecationWarning, message="Please see the migration guide")
 
-# Load documents
-
 def load_pdf_documents(directory_path):
     """
     Loads all PDF documents from the specified directory and returns them as a list of Document objects.
@@ -82,7 +80,6 @@ def load_txt_documents(directory_path):
         print(f"Loaded {len(documents)} TXT documents.")
     return documents
 
-# Split documents into chunks
 def split_documents(documents):
     """
     Splits the provided documents into smaller chunks using a recursive character text splitter.
@@ -106,7 +103,6 @@ def split_documents(documents):
     print(f"Split into {len(splits)} chunks.")
     return splits
 
-# Define document formatting function
 def format_docs(docs):
     """
     Formats a list of Document objects into a single string, separating each document's content with two newlines.
@@ -119,7 +115,6 @@ def format_docs(docs):
     """
     return "\n\n".join(doc.page_content for doc in docs)
 
-# Create the vectorstore using OpenAI embeddings and Chroma
 def create_vectorstore(splits, model_choice):
     """
     Creates a vectorstore from the provided document splits using embeddings and Chroma.
@@ -152,12 +147,32 @@ def create_vectorstore(splits, model_choice):
     return vectorstore
 
 def create_header(model_name, total_width=60):
+    """
+    Creates a formatted header string with a specified model name, centered within a line of equal signs.
+
+    Args:
+        model_name (str): The name of the model to include in the header.
+        total_width (int): The total width of the header line, including padding and the model name. Defaults to 60.
+
+    Returns:
+        str: A formatted header string with the model name centered and padded with equal signs.
+    """
     model_name_str = f" {model_name} "
     padding_width = (total_width - len(model_name_str)) // 2
     header = "=" * padding_width + model_name_str + "=" * (total_width - padding_width - len(model_name_str)) + "\n"
     return header
 
 def create_footer(model_name, total_width=60):
+    """
+    Creates a formatted footer string with a specified model name, centered within a line of equal signs.
+
+    Args:
+        model_name (str): The name of the model to include in the footer.
+        total_width (int): The total width of the footer line, including padding and the model name. Defaults to 60.
+
+    Returns:
+        str: A formatted footer string with the model name centered and padded with equal signs.
+    """
     model_name_str = f" {model_name} "
     padding_width = (total_width - len(model_name_str)) // 2
     footer = "=" * padding_width + model_name_str + "=" * (total_width - padding_width - len(model_name_str)) + "\n"
@@ -175,6 +190,7 @@ def main():
                 "3": "claude-3-sonnet-20240229"
             }
 
+            # LLM selection menu
             llm = None
             while llm is None:
                 print("Select LLM model:")
@@ -196,7 +212,7 @@ def main():
             footer = create_footer(model_name)
             log_file.write(f"{header}\n")
 
-            # Add mode selection menu
+            # Mode selection menu
             mode = None
             while mode not in ["1", "2", "3"]:
                 print("\nSelect mode:")
@@ -207,8 +223,8 @@ def main():
                 if mode not in ["1", "2", "3"]:
                     print("Invalid choice. Try again.")
 
+            # Document selection menu
             if mode != "1":
-                # Prompt user to select document types to load
                 documents = []
                 while not documents:
                     print("\nSelect document types to load:")
@@ -338,8 +354,8 @@ Assistant:""")
                         print("Returning to the main menu...\n")
                         break
                     else:
+                        # Base LLM only
                         if mode == "1":
-                            # Base LLM only
                             base_response = base_llm_chain.invoke({
                                 "user_input": user_input,
                                 "chat_history": get_chat_history_base(None)
@@ -359,8 +375,8 @@ Assistant:""")
                             log_file.write(f"\n####  Base LLM Response:\n{base_response_content}\n")
                             log_file.write(f"\n{footer}\n")
 
+                        # RAG LLM only
                         elif mode == "2":
-                            # RAG LLM only
                             rag_response = rag_chain.invoke({"user_input": user_input})
 
                             rag_memory.save_context({"user_input": user_input}, {"output": rag_response})
@@ -378,8 +394,8 @@ Assistant:""")
                                 log_file.write(f"\n####  RAG LLM Response (PDF + TXT):\n{rag_response}\n")
                             log_file.write(f"\n{footer}\n")
 
+                        # Both LLMs
                         elif mode == "3":
-                            # Both LLMs
                             base_response = base_llm_chain.invoke({
                                 "user_input": user_input,
                                 "chat_history": get_chat_history_base(None)
@@ -411,7 +427,7 @@ Assistant:""")
 
                 except (KeyboardInterrupt, EOFError):
                     print("\nAssistant: Goodbye!")
-                    return  # Exit the program
+                    return
 
 
 if __name__ == '__main__':
