@@ -204,6 +204,11 @@ def main():
             documents.extend(load_txt_documents('./documents'))
         else:
             print("Invalid choice. Try again.")
+def create_header(model_name, total_width=60):
+    model_name_str = f" {model_name} "
+    padding_width = (total_width - len(model_name_str)) // 2
+    header = "=" * padding_width + model_name_str + "=" * (total_width - padding_width - len(model_name_str)) + "\n"
+    return header
 
     if not documents:
         # I don't think we should ever be able to get here...
@@ -222,6 +227,11 @@ def main():
 
     # Set up the retriever
     retriever = vectorstore.as_retriever(search_kwargs={"k": 3})
+def create_footer(model_name, total_width=60):
+    model_name_str = f" {model_name} "
+    padding_width = (total_width - len(model_name_str)) // 2
+    footer = "=" * padding_width + model_name_str + "=" * (total_width - padding_width - len(model_name_str)) + "\n"
+    return footer
 
     # Initialize memory for base LLM
     base_memory = ConversationBufferMemory(memory_key="chat_history", return_messages=True)
