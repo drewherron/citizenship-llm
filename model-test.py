@@ -282,182 +282,138 @@ Context:
 User: {user_input}
 Assistant:""")
 
-    # Function to get chat history for base LLM
-    def get_chat_history_base(_):
-        """
-        Retrieves the conversation history from the base language model's memory.
+            # Function to get chat history for base LLM
+            def get_chat_history_base(_):
+                return base_memory.load_memory_variables({})["chat_history"]
 
-        Args:
-            _ : Placeholder argument (not used).
+            # Function to get chat history for RAG LLM
+            def get_chat_history_rag(_):
+                return rag_memory.load_memory_variables({})["chat_history"]
 
-        Returns:
-            list: A list of messages representing the chat history from the base model.
-        """
-        return base_memory.load_memory_variables({})["chat_history"]
+            # Function to get context
+            def get_context(inputs):
+                return format_docs(
+                    retriever.invoke(inputs["user_input"])
+                )
 
-    # Function to get chat history for RAG LLM
-    def get_chat_history_rag(_):
-        """
-        Retrieves the conversation history from the RAG-enhanced language model's memory.
+            # Welcome message
+            print("\nWelcome to the Citizenship Study Assistant.")
+            if mode == "1":
+                print("Mode: Base LLM")
+            elif mode == "2":
+                print("Mode: RAG LLM")
+            elif mode == "3":
+                print("Mode: Both LLMs")
+            print("Type 'menu' to return to the main menu.")
+            print("Type 'exit' or 'quit' to end the session.\n")
 
-        Args:
-            _ : Placeholder argument (not used).
+            # Create base LLM chain
+            base_llm_chain = RunnableSequence(
+                base_prompt_template,
+                llm
+            )
 
-        Returns:
-            list: A list of messages representing the chat history from the RAG model.
-        """
-        return rag_memory.load_memory_variables({})["chat_history"]
+            # Create RAG chain
+            rag_chain = (
+                RunnableMap(
+                    {
+                        "user_input": RunnablePassthrough(),
+                        "chat_history": get_chat_history_rag,
+                        "context": get_context,
+                    }
+                )
+                | rag_prompt_template
+                | llm
+                | StrOutputParser()
+            )
 
-    # Function to get context
-    def get_context(inputs):
-        """
-        Retrieves relevant context documents based on the user's input by querying the retriever.
+            # Start the REPL
+            while True:
+                try:
+                    user_input = input("Query >> ")
+                    if user_input.lower() in ['exit', 'quit']:
+                        print("Assistant: Goodbye!")
+                        return
+                    elif user_input.lower() == 'menu':
+                        print("Returning to the main menu...\n")
+                        break
+                    else:
+                        if mode == "1":
+                            # Base LLM only
+                            base_response = base_llm_chain.invoke({
+                                "user_input": user_input,
+                                "chat_history": get_chat_history_base(None)
+                            })
 
-        Args:
-            inputs (dict): A dictionary containing the user's input under the key "user_input".
+                            base_response_content = base_response.content if hasattr(base_response, 'content') else str(base_response)
 
-        Returns:
-            str: A formatted string of relevant documents to be used as context in the prompt.
-        """
-        return format_docs(
-            retriever.invoke(inputs["user_input"])
-        )
+                            base_memory.save_context({"user_input": user_input}, {"output": base_response_content})
 
-    # List loaded document sources
-    document_data_sources = set()
-    for doc_metadata in retriever.vectorstore.get()['metadatas']:
-        document_data_sources.add(doc_metadata['source'])
-    print("\nDocuments loaded:")
-    for doc in document_data_sources:
-        print(f"  {doc}")
+                            print(f"\n============== {model_name} - Base LLM ==============")
+                            print("Response:")
+                            print(base_response_content)
+                            print("======================================================\n")
 
-    print("\nWelcome to the Citizenship Study Assistant.")
-    if mode == "1":
-        print("Mode: Base LLM")
-    elif mode == "2":
-        print("Mode: RAG LLM")
-    elif mode == "3":
-        print("Mode: Both LLMs")
-    print("Type 'exit' or 'quit' to end the session.\n")
+                            # Append to log file
+                            log_file.write(f"####  User:\n{user_input}\n")
+                            log_file.write(f"\n####  Base LLM Response:\n{base_response_content}\n")
+                            log_file.write(f"\n{footer}\n")
 
-    # Create base LLM chain
-    base_llm_chain = RunnableSequence(
-        base_prompt_template,
-        llm
-    )
+                        elif mode == "2":
+                            # RAG LLM only
+                            rag_response = rag_chain.invoke({"user_input": user_input})
 
-    # Create RAG chain
-    rag_chain = (
-        RunnableMap(
-            {
-                "user_input": RunnablePassthrough(),
-                "chat_history": get_chat_history_rag,
-                "context": get_context,
-            }
-        )
-        | rag_prompt_template
-        | llm
-        | StrOutputParser()
-    )
+                            rag_memory.save_context({"user_input": user_input}, {"output": rag_response})
 
-    # Start the REPL
-    with open(output_filename, "a") as log_file:
-        log_file.write("============================================\n\n")
-        while True:
-            try:
-                user_input = input("Query >> ")
-                if user_input.lower() in ['exit', 'quit']:
-                    print("Assistant: Goodbye!")
-                    break
+                            print(f"\n============== {model_name} - RAG LLM ==============")
+                            print("Response:")
+                            print(rag_response)
+                            print("======================================================\n")
 
-                if mode == "1":
-                    # Base LLM only
-                    # Invoke base_llm_chain
-                    base_response = base_llm_chain.invoke({
-                        "user_input": user_input,
-                        "chat_history": get_chat_history_base(None)
-                    })
+                            # Append to log file
+                            log_file.write(f"####  User:\n{user_input}\n")
+                            if doc_choice == "1":
+                                log_file.write(f"\n####  RAG LLM Response (PDF only):\n{rag_response}\n")
+                            elif doc_choice == "2":
+                                log_file.write(f"\n####  RAG LLM Response (PDF + TXT):\n{rag_response}\n")
+                            log_file.write(f"\n{footer}\n")
 
-                    # Extract Base LLM response
-                    base_response_content = base_response.content if hasattr(base_response, 'content') else str(base_response)
+                        elif mode == "3":
+                            # Both LLMs
+                            base_response = base_llm_chain.invoke({
+                                "user_input": user_input,
+                                "chat_history": get_chat_history_base(None)
+                            })
 
-                    # Update the memory for the Base LLM
-                    base_memory.save_context({"user_input": user_input}, {"output": base_response_content})
+                            base_response_content = base_response.content if hasattr(base_response, 'content') else str(base_response)
 
-                    # Print response
-                    print(f"\n============== {model_name} - Base LLM ==============")
-                    print("Response:")
-                    print(base_response_content)
-                    print("============================================\n")
+                            base_memory.save_context({"user_input": user_input}, {"output": base_response_content})
 
-                    # Append to log file
-                    log_file.write(f"####  User:                             ####\n{user_input}\n")
-                    log_file.write(f"\n####  Base LLM Response:                #### \n{base_response_content}\n")
-                    log_file.write("\n============================================\n\n")
+                            rag_response = rag_chain.invoke({"user_input": user_input})
 
-                elif mode == "2":
-                    # RAG LLM only
-                    # Invoke rag_chain
-                    rag_response = rag_chain.invoke({"user_input": user_input})
+                            rag_memory.save_context({"user_input": user_input}, {"output": rag_response})
 
-                    # Update the memory for the RAG LLM
-                    rag_memory.save_context({"user_input": user_input}, {"output": rag_response})
+                            print(f"\n============== {model_name} ==============")
+                            print("Base LLM Response:")
+                            print(base_response_content)
+                            print("\nRAG LLM Response:")
+                            print(rag_response)
+                            print("======================================================\n")
 
-                    # Print response
-                    print(f"\n============== {model_name} - RAG LLM ==============")
-                    print("Response:")
-                    print(rag_response)
-                    print("============================================\n")
+                            # Append to log file
+                            log_file.write(f"####  User:\n{user_input}\n")
+                            log_file.write(f"\n####  Base LLM Response:\n{base_response_content}\n")
+                            if doc_choice == "1":
+                                log_file.write(f"\n####  RAG LLM Response (PDF only):\n{rag_response}\n")
+                            elif doc_choice == "2":
+                                log_file.write(f"\n####  RAG LLM Response (PDF + TXT):\n{rag_response}\n")
+                            log_file.write(f"\n{footer}\n")
 
-                    # Append to log file
-                    log_file.write(f"####  User:                             ####\n{user_input}\n")
-                    if doc_choice == "1":
-                        log_file.write(f"\n####  RAG LLM Response (PDF only):      ####\n{rag_response}\n")
-                    elif doc_choice == "2":
-                        log_file.write(f"\n####  RAG LLM Response (PDF + TXT):     ####\n{rag_response}\n")
-                    log_file.write("\n============================================\n\n")
-
-                elif mode == "3":
-                    # Both LLMs
-                    # Invoke base_llm_chain
-                    base_response = base_llm_chain.invoke({
-                        "user_input": user_input,
-                        "chat_history": get_chat_history_base(None)
-                    })
-
-                    # Extract Base LLM response
-                    base_response_content = base_response.content if hasattr(base_response, 'content') else str(base_response)
-
-                    # Update the memory for the Base LLM
-                    base_memory.save_context({"user_input": user_input}, {"output": base_response_content})
-
-                    # Invoke rag_chain
-                    rag_response = rag_chain.invoke({"user_input": user_input})
-
-                    # Update the memory for the RAG LLM
-                    rag_memory.save_context({"user_input": user_input}, {"output": rag_response})
-
-                    # Print both responses
-                    print(f"\n============== {model_name} ==============")
-                    print("Base LLM Response:")
-                    print(base_response_content)
-                    print("\nRAG LLM Response:")
-                    print(rag_response)
-                    print("============================================\n")
-
-                    # Append to log file
-                    log_file.write(f"####  User:                             ####\n{user_input}\n")
-                    log_file.write(f"\n####  Base LLM Response:                #### \n{base_response_content}\n")
-                    if doc_choice == "1":
-                        log_file.write(f"\n####  RAG LLM Response (PDF only):      ####\n{rag_response}\n")
-                    elif doc_choice == "2":
-                        log_file.write(f"\n####  RAG LLM Response (PDF + TXT):     ####\n{rag_response}\n")
-                    log_file.write("\n============================================\n\n")
-
-            except (KeyboardInterrupt, EOFError):
-                print("\nAssistant: Goodbye!")
-                break
+                except (KeyboardInterrupt, EOFError):
+                    print("\nAssistant: Goodbye!")
+                    return  # Exit the program
 
 
 if __name__ == '__main__':
     main()
+
