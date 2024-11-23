@@ -174,7 +174,17 @@ def main():
             print("Invalid choice. Try again.")
 
     model_name = model_names.get(choice)
-    output_filename = f"{model_name}-{datetime.now().strftime('%Y%m%d-%H%M%S')}.txt"
+
+    # Mode selection
+    mode = None
+    while mode not in ["1", "2", "3"]:
+        print("\nSelect mode:")
+        print("1. Base LLM")
+        print("2. RAG LLM")
+        print("3. Both LLMs")
+        mode = input("Choose the mode you want to use: ")
+        if mode not in ["1", "2", "3"]:
+            print("Invalid choice. Try again.")
 
     # Prompt user to select document types to load
     documents = []
@@ -196,9 +206,11 @@ def main():
             print("Invalid choice. Try again.")
 
     if not documents:
-        # I think we shouldn't ever be able to get here...
+        # I don't think we should ever be able to get here...
         print("No documents were loaded. Exiting program.")
         return
+
+    output_filename = f"{model_name}-{datetime.now().strftime('%Y%m%d-%H%M%S')}.txt"
 
     # Split the documents
     print("Splitting documents...")
@@ -285,6 +297,12 @@ Assistant:""")
         print(f"  {doc}")
 
     print("\nWelcome to the Citizenship Study Assistant.")
+    if mode == "1":
+        print("Mode: Base LLM")
+    elif mode == "2":
+        print("Mode: RAG LLM")
+    elif mode == "3":
+        print("Mode: Both LLMs")
     print("Type 'exit' or 'quit' to end the session.\n")
 
     # Create base LLM chain
@@ -309,6 +327,7 @@ Assistant:""")
 
     # Start the REPL
     with open(output_filename, "a") as log_file:
+        log_file.write("============================================\n\n")
         while True:
             try:
                 user_input = input("Query >> ")
@@ -316,37 +335,89 @@ Assistant:""")
                     print("Assistant: Goodbye!")
                     break
 
-                # Invoke base_llm_chain
-                base_response = base_llm_chain.invoke({
-                    "user_input": user_input,
-                    "chat_history": get_chat_history_base(None)
-                })
+                if mode == "1":
+                    # Base LLM only
+                    # Invoke base_llm_chain
+                    base_response = base_llm_chain.invoke({
+                        "user_input": user_input,
+                        "chat_history": get_chat_history_base(None)
+                    })
 
-                # Extract Base LLM response
-                base_response_content = base_response.content if hasattr(base_response, 'content') else str(base_response)
+                    # Extract Base LLM response
+                    base_response_content = base_response.content if hasattr(base_response, 'content') else str(base_response)
 
-                # Update the memory for the Base LLM
-                base_memory.save_context({"user_input": user_input}, {"output": base_response_content})
+                    # Update the memory for the Base LLM
+                    base_memory.save_context({"user_input": user_input}, {"output": base_response_content})
 
-                # Invoke rag_chain
-                rag_response = rag_chain.invoke({"user_input": user_input})
+                    # Print response
+                    print(f"\n============== {model_name} - Base LLM ==============")
+                    print("Response:")
+                    print(base_response_content)
+                    print("============================================\n")
 
-                # Update the memory for the RAG LLM
-                rag_memory.save_context({"user_input": user_input}, {"output": rag_response})
+                    # Append to log file
+                    log_file.write(f"####  User:                             ####\n{user_input}\n")
+                    log_file.write(f"\n####  Base LLM Response:                #### \n{base_response_content}\n")
+                    log_file.write("\n============================================\n\n")
 
-                # Print both results for comparison
-                print(f"\n============== {model_name} ==============")
-                print("Base LLM Response:")
-                print(base_response_content)
-                print("\nRAG LLM Response:")
-                print(rag_response)
-                print("============================================\n")
+                elif mode == "2":
+                    # RAG LLM only
+                    # Invoke rag_chain
+                    rag_response = rag_chain.invoke({"user_input": user_input})
 
-                # Append user input and responses to the log file
-                log_file.write(f"  ####  User:               ####\n{user_input}\n")
-                log_file.write(f"\n####  Base LLM Response:  #### \n{base_response_content}\n")
-                log_file.write(f"\n####  RAG LLM Response:   ####\n{rag_response}\n")
-                log_file.write("============================================\n\n")
+                    # Update the memory for the RAG LLM
+                    rag_memory.save_context({"user_input": user_input}, {"output": rag_response})
+
+                    # Print response
+                    print(f"\n============== {model_name} - RAG LLM ==============")
+                    print("Response:")
+                    print(rag_response)
+                    print("============================================\n")
+
+                    # Append to log file
+                    log_file.write(f"####  User:                             ####\n{user_input}\n")
+                    if doc_choice == "1":
+                        log_file.write(f"\n####  RAG LLM Response (PDF only):      ####\n{rag_response}\n")
+                    elif doc_choice == "2":
+                        log_file.write(f"\n####  RAG LLM Response (PDF + TXT):     ####\n{rag_response}\n")
+                    log_file.write("\n============================================\n\n")
+
+                elif mode == "3":
+                    # Both LLMs
+                    # Invoke base_llm_chain
+                    base_response = base_llm_chain.invoke({
+                        "user_input": user_input,
+                        "chat_history": get_chat_history_base(None)
+                    })
+
+                    # Extract Base LLM response
+                    base_response_content = base_response.content if hasattr(base_response, 'content') else str(base_response)
+
+                    # Update the memory for the Base LLM
+                    base_memory.save_context({"user_input": user_input}, {"output": base_response_content})
+
+                    # Invoke rag_chain
+                    rag_response = rag_chain.invoke({"user_input": user_input})
+
+                    # Update the memory for the RAG LLM
+                    rag_memory.save_context({"user_input": user_input}, {"output": rag_response})
+
+                    # Print both responses
+                    print(f"\n============== {model_name} ==============")
+                    print("Base LLM Response:")
+                    print(base_response_content)
+                    print("\nRAG LLM Response:")
+                    print(rag_response)
+                    print("============================================\n")
+
+                    # Append to log file
+                    log_file.write(f"####  User:                             ####\n{user_input}\n")
+                    log_file.write(f"\n####  Base LLM Response:                #### \n{base_response_content}\n")
+                    if doc_choice == "1":
+                        log_file.write(f"\n####  RAG LLM Response (PDF only):      ####\n{rag_response}\n")
+                    elif doc_choice == "2":
+                        log_file.write(f"\n####  RAG LLM Response (PDF + TXT):     ####\n{rag_response}\n")
+                    log_file.write("\n============================================\n\n")
 
             except (KeyboardInterrupt, EOFError):
                 print("\nAssistant: Goodbye!")
