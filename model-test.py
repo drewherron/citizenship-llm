@@ -1,4 +1,5 @@
 import os
+import uuid
 import warnings
 from datetime import datetime
 from langchain import hub
@@ -129,9 +130,6 @@ def create_vectorstore(splits, model_choice):
 
     Returns:
         Chroma: An instance of the Chroma vectorstore containing the document embeddings.
-
-    Prints:
-        str: A message confirming successful creation of the vectorstore.
     """
     if model_choice == "1":
         embeddings = OpenAIEmbeddings()
@@ -142,112 +140,139 @@ def create_vectorstore(splits, model_choice):
     else:
         raise ValueError("Invalid model choice for embeddings.")
 
+    # Generate a unique collection name using UUID
+    collection_name = str(uuid.uuid4())
+
     vectorstore = Chroma.from_documents(
         documents=splits,
         embedding=embeddings,
+        collection_name=collection_name,
     )
     print("Vectorstore created successfully.")
     return vectorstore
 
-def main():
-
-    model_names = {
-        "1": "gpt-3.5-turbo",
-        "2": "gemini-1.5-pro",
-        "3": "claude-3-sonnet-20240229"
-    }
-
-    llm = None
-    while llm is None:
-        print("Select LLM model:")
-        for key, name in model_names.items():
-            print(f"{key}. {name}")
-        choice = input("Choose the model you want to use: ")
-
-        if choice == "1":
-            llm = ChatOpenAI(model_name="gpt-3.5-turbo", temperature=0)
-        elif choice == "2":
-            llm = ChatGoogleGenerativeAI(model="gemini-1.5-pro")
-        elif choice == "3":
-            llm = ChatAnthropic(model="claude-3-sonnet-20240229")
-        else:
-            print("Invalid choice. Try again.")
-
-    model_name = model_names.get(choice)
-
-    # Mode selection
-    mode = None
-    while mode not in ["1", "2", "3"]:
-        print("\nSelect mode:")
-        print("1. Base LLM")
-        print("2. RAG LLM")
-        print("3. Both LLMs")
-        mode = input("Choose the mode you want to use: ")
-        if mode not in ["1", "2", "3"]:
-            print("Invalid choice. Try again.")
-
-    # Prompt user to select document types to load
-    documents = []
-    while not documents:
-        print("\nSelect document types to load:")
-        print("1. PDF only")
-        print("2. PDF and TXT files")
-        doc_choice = input("Choose the documents you want to load: ")
-
-        if doc_choice == "1":
-            print("\nLoading PDF documents...")
-            documents = load_pdf_documents('./documents')
-        elif doc_choice == "2":
-            print("\nLoading PDF documents...")
-            documents = load_pdf_documents('./documents')
-            print("Loading TXT documents...")
-            documents.extend(load_txt_documents('./documents'))
-        else:
-            print("Invalid choice. Try again.")
 def create_header(model_name, total_width=60):
     model_name_str = f" {model_name} "
     padding_width = (total_width - len(model_name_str)) // 2
     header = "=" * padding_width + model_name_str + "=" * (total_width - padding_width - len(model_name_str)) + "\n"
     return header
 
-    if not documents:
-        # I don't think we should ever be able to get here...
-        print("No documents were loaded. Exiting program.")
-        return
-
-    output_filename = f"{model_name}-{datetime.now().strftime('%Y%m%d-%H%M%S')}.txt"
-
-    # Split the documents
-    print("Splitting documents...")
-    splits = split_documents(documents)
-
-    # Create vectorstore
-    print("Creating vectorstore...")
-    vectorstore = create_vectorstore(splits, choice)
-
-    # Set up the retriever
-    retriever = vectorstore.as_retriever(search_kwargs={"k": 3})
 def create_footer(model_name, total_width=60):
     model_name_str = f" {model_name} "
     padding_width = (total_width - len(model_name_str)) // 2
     footer = "=" * padding_width + model_name_str + "=" * (total_width - padding_width - len(model_name_str)) + "\n"
     return footer
 
-    # Initialize memory for base LLM
-    base_memory = ConversationBufferMemory(memory_key="chat_history", return_messages=True)
+def main():
 
-    # Initialize memory for RAG LLM
-    rag_memory = ConversationBufferMemory(memory_key="chat_history", return_messages=True)
+    output_filename = "logfile.txt"
+    with open(output_filename, "a") as log_file:
+        while True:
+            # Initialize model selection
+            model_names = {
+                "1": "gpt-3.5-turbo",
+                "2": "gemini-1.5-pro",
+                "3": "claude-3-sonnet-20240229"
+            }
 
-    # Create prompt templates
-    base_prompt_template = ChatPromptTemplate.from_template("""
+            llm = None
+            while llm is None:
+                print("Select LLM model:")
+                for key, name in model_names.items():
+                    print(f"{key}. {name}")
+                choice = input("Choose the model you want to use: ")
+
+                if choice == "1":
+                    llm = ChatOpenAI(model_name="gpt-3.5-turbo", temperature=0)
+                elif choice == "2":
+                    llm = ChatGoogleGenerativeAI(model="gemini-1.5-pro")
+                elif choice == "3":
+                    llm = ChatAnthropic(model="claude-3-sonnet-20240229")
+                else:
+                    print("Invalid choice. Try again.")
+
+            model_name = model_names.get(choice)
+            header = create_header(model_name)
+            footer = create_footer(model_name)
+            log_file.write(f"{header}\n")
+
+            # Add mode selection menu
+            mode = None
+            while mode not in ["1", "2", "3"]:
+                print("\nSelect mode:")
+                print("1. Base LLM")
+                print("2. RAG LLM")
+                print("3. Both LLMs")
+                mode = input("Choose the mode you want to use: ")
+                if mode not in ["1", "2", "3"]:
+                    print("Invalid choice. Try again.")
+
+            if mode != "1":
+                # Prompt user to select document types to load
+                documents = []
+                while not documents:
+                    print("\nSelect document types to load:")
+                    print("1. PDF only")
+                    print("2. PDF and TXT files")
+                    doc_choice = input("Choose the documents you want to load: ")
+
+                    if doc_choice == "1":
+                        print("\nLoading PDF documents...")
+                        documents = load_pdf_documents('./documents')
+                    elif doc_choice == "2":
+                        print("\nLoading PDF documents...")
+                        documents = load_pdf_documents('./documents')
+                        print("Loading TXT documents...")
+                        documents.extend(load_txt_documents('./documents'))
+                    else:
+                        print("Invalid choice. Try again.")
+
+                if not documents:
+                    print("No documents were loaded. Exiting program.")
+                    return
+
+                # Split the documents
+                print("Splitting documents...")
+                splits = split_documents(documents)
+
+                # Create vectorstore
+                print("Creating vectorstore...")
+                vectorstore = create_vectorstore(splits, choice)
+
+                # Set up the retriever
+                retriever = vectorstore.as_retriever(search_kwargs={"k": 3})
+
+                # List loaded document sources
+                document_data_sources = set()
+                for doc_metadata in retriever.vectorstore.get()['metadatas']:
+                    source = doc_metadata['source']
+                    if not source.startswith('./'):
+                        source = './' + source
+                    document_data_sources.add(source)
+                print("\nDocuments loaded:")
+                for doc in document_data_sources:
+                    print(f"  {doc}")
+            else:
+                # When in Base LLM mode, set retriever to None
+                retriever = None
+                documents = []
+                doc_choice = None
+
+            # Initialize memory for base LLM
+            base_memory = ConversationBufferMemory(memory_key="chat_history", return_messages=True)
+
+            # Initialize memory for RAG LLM
+            rag_memory = ConversationBufferMemory(memory_key="chat_history", return_messages=True)
+
+            # Create prompt templates
+            base_prompt_template = ChatPromptTemplate.from_template("""
 You are an assistant helping with U.S. citizenship, naturalization, and the citizenship exam. Be a critical tutor and be fair but not so agreeable that your feedback is incorrect. The user wants to learn from their mistakes, and wants honest feedback.
 
 {chat_history}
 User: {user_input}
 Assistant:""")
 
-    rag_prompt_template = ChatPromptTemplate.from_template("""
+            rag_prompt_template = ChatPromptTemplate.from_template("""
 You are an assistant helping with U.S. citizenship, naturalization, and the citizenship exam. Be a critical tutor and be fair but not so agreeable that your feedback is incorrect. The user wants to learn from their mistakes, and wants honest feedback.
 
 Context:
