@@ -229,17 +229,15 @@ def main():
                 while not documents:
                     print("\nSelect document types to load:")
                     print("1. PDF only")
-                    print("2. PDF and TXT files")
+                    print("2. TXT only")
                     doc_choice = input("Choose the documents you want to load: ")
 
                     if doc_choice == "1":
                         print("\nLoading PDF documents...")
                         documents = load_pdf_documents('./documents')
                     elif doc_choice == "2":
-                        print("\nLoading PDF documents...")
-                        documents = load_pdf_documents('./documents')
-                        print("Loading TXT documents...")
-                        documents.extend(load_txt_documents('./documents'))
+                        print("\nLoading TXT documents...")
+                        documents = load_txt_documents('./documents')
                     else:
                         print("Invalid choice. Try again.")
 
@@ -391,7 +389,7 @@ Assistant:""")
                             if doc_choice == "1":
                                 log_file.write(f"\n####  RAG LLM Response (PDF only):\n{rag_response}\n")
                             elif doc_choice == "2":
-                                log_file.write(f"\n####  RAG LLM Response (PDF + TXT):\n{rag_response}\n")
+                                log_file.write(f"\n####  RAG LLM Response (TXT only):\n{rag_response}\n")
                             log_file.write(f"\n{footer}\n")
 
                         # Both LLMs
@@ -422,7 +420,7 @@ Assistant:""")
                             if doc_choice == "1":
                                 log_file.write(f"\n####  RAG LLM Response (PDF only):\n{rag_response}\n")
                             elif doc_choice == "2":
-                                log_file.write(f"\n####  RAG LLM Response (PDF + TXT):\n{rag_response}\n")
+                                log_file.write(f"\n####  RAG LLM Response (TXT only):\n{rag_response}\n")
                             log_file.write(f"\n{footer}\n")
 
                 except (KeyboardInterrupt, EOFError):
@@ -432,4 +430,3 @@ Assistant:""")
 
 if __name__ == '__main__':
     main()
-
